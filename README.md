@@ -179,7 +179,9 @@ The scripts detect sections by looking for **Heading 2** paragraphs whose text c
 | "true" | True/False |
 | "multiple" | Multiple Choice |
 | "fill" or "blank" | Fill-in-the-Blank |
-| *(none — detected by list structure)* | Workout |
+| *(Heading 2 immediately before the first workout list item)* | Workout |
+
+> ⚠️ **Each section heading must be its own standalone paragraph** formatted as Heading 2 — not typed inline within a question or answer choice. A common mistake is inserting a page break inside a list item and typing the next section heading on the same line: the heading text ends up inside the list item and is never recognised as a section boundary. If a section heading appears to be missing or lands in the wrong place after shuffling, check that it is a separate paragraph in the original document.
 
 Questions must be formatted as **Word numbered lists** (the automatic kind, not manually typed numbers). Answer choices for True/False and Multiple Choice should be **bullet-point sub-items** under each question.
 
@@ -220,6 +222,8 @@ The script handles page layout automatically:
 5. **Gives each Workout question its own page.** Every question after the first in the Workout section starts on a new page.
 
 6. **Ensures "This page intentionally left blank" pages always start on a new page.** Include however many you need in the source document and the script will handle the breaks automatically.
+
+> ⚠️ **"This page intentionally left blank" text must appear in its own paragraph, after the last question in the document** — not inside a question's list item. If it is typed inside a list item (e.g. after a page break within an answer choice), it will be treated as part of that question and shuffled along with it.
 
 ---
 
