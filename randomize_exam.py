@@ -17,7 +17,7 @@ All output files contain the exact same questions; only the order differs.
 Usage:
     # Two versions (default) — outputs written next to the input file
     python3 randomize_exam.py /path/to/Exam1.docx                 # Mac/Linux
-    py      randomize_exam.py C:\path\to\Exam1.docx               # Windows
+    py      randomize_exam.py C:\\path\\to\\Exam1.docx              # Windows
 
     # Four versions next to the input file
     python3 randomize_exam.py /path/to/Exam1.docx --versions 4
@@ -209,28 +209,17 @@ def is_page_break_only(p):
     return any(br.get(WP("type")) == "page" for br in p.iter(WP("br")))
 
 
-def strip_inline_breaks(p):
-    """
-    Remove soft line-return <w:br> elements from within a paragraph's runs.
-    These are manual line breaks inserted with Shift+Enter in Word
-    (<w:br w:type="textWrapping"/> or <w:br/> with no type attribute).
-    Page breaks and column breaks are left alone.
-    """
-    for run in p.findall(WP("r")):
-        for br in list(run.findall(WP("br"))):
-            if br.get(WP("type")) not in ("page", "column"):
-                run.remove(br)
-
-
 def strip_page_breaks(block):
     """
-    Remove explicit page breaks and soft line breaks from a list of paragraphs
-    so Word can reflow text naturally after shuffling.
+    Remove explicit page breaks from a list of paragraphs so Word can reflow
+    text naturally after shuffling.
 
       • Drops paragraphs that are pure page-break runs (<w:br w:type="page"/>).
       • Removes <w:pageBreakBefore/> from paragraph properties (this property
         forces a paragraph to always start on a new page).
-      • Removes soft line-return <w:br> elements from within runs.
+
+    Soft line returns (Shift+Enter) within question content are intentional
+    spacing chosen by the exam author and are left untouched.
 
     Section-heading paragraphs (in the 'pre' list, not inside any block) are
     left untouched, so intentional section-level breaks are preserved.
@@ -244,7 +233,6 @@ def strip_page_breaks(block):
             pb = pPr.find(WP("pageBreakBefore"))
             if pb is not None:
                 pPr.remove(pb)
-        strip_inline_breaks(p)
         result.append(p)
     return result
 
@@ -258,10 +246,16 @@ def is_blank_paragraph(p):
 
 def strip_trailing_spacers(block):
     """
-    Remove blank paragraphs from the end of a question block.
-    Blank paragraphs are inserted manually in source documents to create
-    visual spacing between questions; after shuffling we insert a single
-    uniform blank paragraph between every pair of questions instead.
+    Remove blank paragraphs from the *end* of a question block only.
+
+    Blank paragraphs in the interior of a block (e.g. between a question
+    stem and its first answer choice, or between answer choices) are left
+    untouched — they are intentional within-question formatting.
+
+    Only trailing blanks — those that appear after the last list item and
+    before the next question stem — are stripped.  A single uniform blank
+    paragraph is then inserted between every pair of questions by the
+    caller, replacing the source document's ad-hoc between-question spacing.
     """
     while block and is_blank_paragraph(block[-1]):
         block = block[:-1]
@@ -292,15 +286,44 @@ def add_keep_together(block):
 
 def update_version_label(body, new_label):
     """
-    Replace the first occurrence of 'Version <letter>' in a <w:t> element
-    with new_label.  Matches any single uppercase letter so it works for A–Z.
+    Replace the first occurrence of 'Version <letter>' with new_label.
+
+    Word often splits a heading into many small <w:t> runs (one per formatted
+    span), so 'Version ' and the letter may live in adjacent nodes rather than
+    a single one.  This function handles both cases:
+
+      1. Simple — the whole 'Version X' token is inside one <w:t>.
+      2. Split  — 'Version ' ends one <w:t> and the letter starts the next
+                  (possibly with leading whitespace).
     """
-    pattern = re.compile(r"Version\s+[A-Z]", re.IGNORECASE)
+    pattern    = re.compile(r"Version\s+[A-Z]", re.IGNORECASE)
+    new_letter = new_label.split()[-1]          # "A" from "Version A"
+
     for p in body.iter(WP("p")):
-        for t in p.iter(WP("t")):
-            if t.text and pattern.search(t.text):
+        if not pattern.search(get_text(p)):
+            continue
+
+        t_nodes = [t for t in p.iter(WP("t")) if t.text is not None]
+
+        # Case 1: entire match in one node
+        for t in t_nodes:
+            if pattern.search(t.text):
                 t.text = pattern.sub(new_label, t.text)
-                return  # only update the title line
+                return
+
+        # Case 2: "Version " ends one node, letter begins the next
+        for i, t in enumerate(t_nodes):
+            if not re.search(r"Version\s*$", t.text, re.IGNORECASE):
+                continue
+            for j in range(i + 1, len(t_nodes)):
+                ahead = t_nodes[j].text
+                m = re.match(r"(\s*)([A-Z])(.*)", ahead, re.IGNORECASE)
+                if m:
+                    t_nodes[j].text = m.group(1) + new_letter + m.group(3)
+                    return
+                if ahead.strip():   # non-whitespace, non-letter — give up
+                    break
+        return  # paragraph matched full text but structure was unexpected
 
 
 # ── section detection ─────────────────────────────────────────────────────────

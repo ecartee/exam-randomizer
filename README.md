@@ -186,9 +186,7 @@ The shuffling uses seeds drawn from the operating system's random-number generat
 
 The script handles page layout automatically:
 
-1. **Strips all manual breaks** from within question content:
-   - Standalone page-break paragraphs and `pageBreakBefore` paragraph properties are removed so page breaks placed around specific questions in the original don't land in arbitrary positions after shuffling.
-   - Soft line returns (Shift+Enter, `<w:br type="textWrapping"/>`) are removed from within paragraph runs, since these are typically used to force visual spacing in the source document rather than to convey meaning.
+1. **Strips manual page breaks** from within question content: standalone page-break paragraphs and `pageBreakBefore` paragraph properties are removed so breaks placed around specific questions in the original don't land in arbitrary positions after shuffling. Soft line returns (Shift+Enter) within question content are left untouched — they are intentional spacing chosen by the exam author.
 
 2. **Normalises spacing between questions.** Blank paragraphs that trail each question block in the source document are stripped, and a single uniform blank paragraph is inserted between every pair of questions. Spacing is therefore consistent across all versions regardless of how the source document was formatted.
 
