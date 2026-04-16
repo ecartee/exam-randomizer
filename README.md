@@ -135,6 +135,18 @@ All checks passed.
 
 ---
 
+## Recommended workflow
+
+1. **Randomize** — run `randomize_exam.py` to generate all versions.
+
+2. **Adjust manually** — open each version in Word and:
+   - Add or remove blank lines and page breaks as needed so questions sit where you want them on the page.
+   - Reposition any floating images that didn't follow their questions correctly (see [Floating images](#floating-images) below).
+
+3. **Verify** — run `verify_exam.py` against the adjusted files. Because the verifier works from list-numbering structure and question text rather than whitespace or image positions, it will still pass correctly after manual edits.
+
+---
+
 ## Document format requirements
 
 The scripts detect sections by looking for **Heading 2** paragraphs whose text contains recognisable keywords:
@@ -174,15 +186,19 @@ The shuffling uses seeds drawn from the operating system's random-number generat
 
 The script handles page layout automatically:
 
-1. **Strips manual page breaks** from within question content (both standalone page-break paragraphs and "page break before" paragraph properties), so breaks placed around specific questions in the original don't land in arbitrary positions after shuffling.
+1. **Strips all manual breaks** from within question content:
+   - Standalone page-break paragraphs and `pageBreakBefore` paragraph properties are removed so page breaks placed around specific questions in the original don't land in arbitrary positions after shuffling.
+   - Soft line returns (Shift+Enter, `<w:br type="textWrapping"/>`) are removed from within paragraph runs, since these are typically used to force visual spacing in the source document rather than to convey meaning.
 
-2. **Keeps questions together** by adding `keepNext` (keep this paragraph on the same page as the next) and `keepLines` (keep all lines of this paragraph together) to every paragraph in a question block except the last. This prevents questions from being split mid-paragraph or across answer choices.
+2. **Normalises spacing between questions.** Blank paragraphs that trail each question block in the source document are stripped, and a single uniform blank paragraph is inserted between every pair of questions. Spacing is therefore consistent across all versions regardless of how the source document was formatted.
 
-3. **Adds a clean page break before each section** after the first (e.g. Multiple Choice, Fill-in-the-Blank, Workout each start on a new page).
+3. **Keeps questions together** by adding `keepNext` (keep this paragraph on the same page as the next) and `keepLines` (keep all lines of this paragraph together) to every paragraph in a question block except the last. Word uses these flags — rather than manual spacing — to decide where page breaks fall after shuffling.
 
-4. **Gives each Workout question its own page.** Every question after the first in the Workout section starts on a new page.
+4. **Adds a clean page break before each section** after the first (e.g. Multiple Choice, Fill-in-the-Blank, Workout each start on a new page).
 
-5. **Ensures "This page intentionally left blank" pages always start on a new page.** Include however many you need in the source document and the script will handle the breaks automatically.
+5. **Gives each Workout question its own page.** Every question after the first in the Workout section starts on a new page.
+
+6. **Ensures "This page intentionally left blank" pages always start on a new page.** Include however many you need in the source document and the script will handle the breaks automatically.
 
 ---
 

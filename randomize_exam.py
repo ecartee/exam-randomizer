@@ -209,14 +209,28 @@ def is_page_break_only(p):
     return any(br.get(WP("type")) == "page" for br in p.iter(WP("br")))
 
 
+def strip_inline_breaks(p):
+    """
+    Remove soft line-return <w:br> elements from within a paragraph's runs.
+    These are manual line breaks inserted with Shift+Enter in Word
+    (<w:br w:type="textWrapping"/> or <w:br/> with no type attribute).
+    Page breaks and column breaks are left alone.
+    """
+    for run in p.findall(WP("r")):
+        for br in list(run.findall(WP("br"))):
+            if br.get(WP("type")) not in ("page", "column"):
+                run.remove(br)
+
+
 def strip_page_breaks(block):
     """
-    Remove explicit page breaks from a question block so Word can reflow text
-    naturally after shuffling.
+    Remove explicit page breaks and soft line breaks from a list of paragraphs
+    so Word can reflow text naturally after shuffling.
 
       • Drops paragraphs that are pure page-break runs (<w:br w:type="page"/>).
       • Removes <w:pageBreakBefore/> from paragraph properties (this property
         forces a paragraph to always start on a new page).
+      • Removes soft line-return <w:br> elements from within runs.
 
     Section-heading paragraphs (in the 'pre' list, not inside any block) are
     left untouched, so intentional section-level breaks are preserved.
@@ -230,8 +244,28 @@ def strip_page_breaks(block):
             pb = pPr.find(WP("pageBreakBefore"))
             if pb is not None:
                 pPr.remove(pb)
+        strip_inline_breaks(p)
         result.append(p)
     return result
+
+
+def is_blank_paragraph(p):
+    """Return True if p is an empty or whitespace-only paragraph (no visible text)."""
+    if p.tag != WP("p"):
+        return False
+    return not any(t.text and t.text.strip() for t in p.iter(WP("t")))
+
+
+def strip_trailing_spacers(block):
+    """
+    Remove blank paragraphs from the end of a question block.
+    Blank paragraphs are inserted manually in source documents to create
+    visual spacing between questions; after shuffling we insert a single
+    uniform blank paragraph between every pair of questions instead.
+    """
+    while block and is_blank_paragraph(block[-1]):
+        block = block[:-1]
+    return block
 
 
 def add_keep_together(block):
@@ -413,6 +447,7 @@ def build_shuffled_body_children(body_children, sections, rng):
         blocks = [list(b) for b in blocks]   # shallow copies for safety
         pre    = strip_page_breaks(pre)       # remove source-doc breaks from preamble too
         blocks = [strip_page_breaks(b) for b in blocks]
+        blocks = [strip_trailing_spacers(b) for b in blocks]
         rng.shuffle(blocks)
         if sec["shuffle_answers"]:
             blocks = [shuffle_mc_answers(b, sec["q_numIds"], rng) for b in blocks]
@@ -420,7 +455,14 @@ def build_shuffled_body_children(body_children, sections, rng):
         # paragraph order within each block (after any answer shuffling)
         blocks = [add_keep_together(b) for b in blocks]
 
-        flat = pre + [p for block in blocks for p in block]
+        # Flatten with a single blank paragraph between every pair of questions
+        # (source-doc spacers have been stripped; spacing is now uniform)
+        flat_blocks = []
+        for i, block in enumerate(blocks):
+            flat_blocks.extend(block)
+            if i < len(blocks) - 1:
+                flat_blocks.append(etree.Element(WP("p")))  # one blank line separator
+        flat = pre + flat_blocks
 
         if sec["label"] == "Workout":
             # Workout page breaks are handled explicitly rather than via the
