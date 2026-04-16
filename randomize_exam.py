@@ -500,25 +500,26 @@ def detect_sections(body_children):
         if last_fib_item + 1 < wo_s:
             wo_s = last_fib_item + 1
 
-    # ── Workout ends at the first "INTENTIONALLY LEFT BLANK" paragraph
-    wo_e = n
-    if wo_ids:
-        for i in range(wo_s, n):
-            if body_children[i].tag == WP("p"):
-                if "INTENTIONALLY LEFT BLANK" in get_text(body_children[i]).upper():
-                    wo_e = i
-                    break
+    # ── Find the first "INTENTIONALLY LEFT BLANK" paragraph.
+    #    This acts as a hard stop for ALL sections — those pages must never be
+    #    included in any question block, regardless of which section is last.
+    questions_end = n
+    for i in range(tf_s, n):
+        if body_children[i].tag == WP("p"):
+            if "INTENTIONALLY LEFT BLANK" in get_text(body_children[i]).upper():
+                questions_end = i
+                break
 
     # ── Build section list
     sections = []
     if tf_ids:
-        sections.append({"label": "True/False",      "paras": body_children[tf_s:mc_s],  "q_numIds": tf_ids,  "shuffle_answers": False})
+        sections.append({"label": "True/False",      "paras": body_children[tf_s:min(mc_s,  questions_end)], "q_numIds": tf_ids,  "shuffle_answers": False})
     if mc_ids:
-        sections.append({"label": "Multiple Choice", "paras": body_children[mc_s:fib_s], "q_numIds": mc_ids,  "shuffle_answers": True})
+        sections.append({"label": "Multiple Choice", "paras": body_children[mc_s:min(fib_s, questions_end)], "q_numIds": mc_ids,  "shuffle_answers": True})
     if fib_ids:
-        sections.append({"label": "Fill in Blank",   "paras": body_children[fib_s:wo_s], "q_numIds": fib_ids, "shuffle_answers": False})
+        sections.append({"label": "Fill in Blank",   "paras": body_children[fib_s:min(wo_s, questions_end)], "q_numIds": fib_ids, "shuffle_answers": False})
     if wo_ids:
-        sections.append({"label": "Workout",         "paras": body_children[wo_s:wo_e],  "q_numIds": wo_ids,  "shuffle_answers": False})
+        sections.append({"label": "Workout",         "paras": body_children[wo_s:questions_end],              "q_numIds": wo_ids,  "shuffle_answers": False})
     return sections
 
 
