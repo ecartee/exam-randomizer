@@ -15,7 +15,7 @@ For each shuffled version it verifies:
 Usage:
     # Auto-detect _A, _B, … versions next to the original (most common)
     python3 verify_exam.py /path/to/Exam1.docx                            # Mac/Linux
-    py      verify_exam.py C:\path\to\Exam1.docx                          # Windows
+    py      verify_exam.py C:\\path\\to\\Exam1.docx                         # Windows
 
     # Or pass version files explicitly
     python3 verify_exam.py original.docx shuffled_A.docx shuffled_B.docx [...]
