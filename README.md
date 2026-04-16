@@ -147,11 +147,15 @@ All checks passed.
 
 ---
 
-## Template
+## Templates
 
-`Exam_Template1.docx` is a ready-to-edit starting point. Download it, replace the placeholder content with your own questions, and run the scripts straight away.
+Two ready-to-edit starting points are included. Download the one that matches your exam format, replace the placeholder content with your own questions, and run the scripts straight away.
 
-The template covers all four section types and is designed to demonstrate edge cases the randomizer handles:
+**`Exam_Template1.docx`** — midterm format, with all four section types: True/False, Multiple Choice, Fill-in-the-Blank, and Workout.
+
+**`Exam_Template2.docx`** — final exam format, Multiple Choice only (35 questions).
+
+`Exam_Template1.docx` is designed to demonstrate edge cases the randomizer handles:
 
 | Section | What it demonstrates |
 |---|---|
