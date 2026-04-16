@@ -798,6 +798,11 @@ def main():
             print(f"WARNING: duplicate question stem in {sec['label']} — "
                   f"{stem[:70]!r}")
 
+    sec_summary = ", ".join(
+        f"{s['label']} ({len(group_questions(s['paras'], s['q_numIds'])[1])})"
+        for s in sections
+    )
+    print(f"Sections found:  {sec_summary or '(none)'}")
     print(f"Generating {n} version{'s' if n != 1 else ''} from: {args.input}")
     print(f"Seeds {seed_note}:")
     for i, (out_path, seed) in enumerate(zip(output_paths, seeds)):
