@@ -432,17 +432,44 @@ def detect_sections(body_children):
 
     fib_first_id = first_q_numId(fib_s, n)
 
-    # ── Pass 3: find where Workout begins (first ilvl=0 paragraph after FIB
-    #            whose numId differs from the first FIB numId)
+    # ── Pass 3: find where Workout begins.
+    #
+    # Step A: find the first ilvl=0 list item after FIB whose numId differs
+    #         from the FIB numId — that's the first Workout question stem.
+    # Step B: scan *backward* from that list item looking for a Heading 2
+    #         that immediately precedes it (with only blank paragraphs in
+    #         between).  If found, start the Workout section at the heading
+    #         so that it lands in the Workout section's 'pre' (preamble) and
+    #         gets the page-break treatment rather than being glued to the
+    #         last FIB question block.
     wo_s = n
     if fib_first_id is not None:
+        first_wo_list = n
         for i in range(fib_s, n):
             if body_children[i].tag != WP("p"):
                 continue
             nid, ilvl = get_num_props(body_children[i])
             if nid is not None and ilvl == "0" and nid != fib_first_id:
-                wo_s = i
+                first_wo_list = i
                 break
+
+        wo_s = first_wo_list   # default: start at the first list item
+
+        # Walk backward to find an immediately preceding Heading 2
+        if first_wo_list < n:
+            for i in range(first_wo_list - 1, fib_s - 1, -1):
+                if body_children[i].tag != WP("p"):
+                    continue
+                if is_heading(body_children[i], 2):
+                    wo_s = i   # promote: section starts at the heading
+                    break
+                # Stop if we hit a list item (FIB content) or non-blank text
+                nid, _ = get_num_props(body_children[i])
+                if nid is not None:
+                    break
+                if any(t.text and t.text.strip()
+                       for t in body_children[i].iter(WP("t"))):
+                    break
 
     # ── Pass 4: collect ALL ilvl=0 numIds within each section's actual range
     def all_numIds(start, end):
