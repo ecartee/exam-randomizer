@@ -777,12 +777,26 @@ def main():
         seeds = [base + i for i in range(n)]
         seed_note = "(randomly generated — record these to reproduce later)"
 
-    # Detect sections once from the input so we can tailor the closing tip.
+    # Detect sections once from the input so we can tailor the closing tip
+    # and run pre-flight checks.
     input_root     = read_document_xml(args.input)
     input_body     = input_root.find(WP("body"))
     input_children = [c for c in input_body if c.tag != WP("sectPr")]
     sections       = detect_sections(input_children)
     has_fib        = any(s["label"] == "Fill in Blank" for s in sections)
+
+    # ── Pre-flight: warn about duplicate question stems within any section ────
+    for sec in sections:
+        _, blocks = group_questions(sec["paras"], sec["q_numIds"])
+        stems = [get_text(block[0]) for block in blocks if block]
+        seen, dupes = set(), []
+        for stem in stems:
+            if stem in seen and stem not in dupes:
+                dupes.append(stem)
+            seen.add(stem)
+        for stem in dupes:
+            print(f"WARNING: duplicate question stem in {sec['label']} — "
+                  f"{stem[:70]!r}")
 
     print(f"Generating {n} version{'s' if n != 1 else ''} from: {args.input}")
     print(f"Seeds {seed_note}:")
