@@ -770,11 +770,19 @@ def main():
         seeds = [args.base_seed + i for i in range(n)]
         seed_note = f"(fixed --base-seed {args.base_seed})"
     else:
-        # Draw independent seeds from the OS RNG — unpredictable even if the
-        # source code is public.  We cap at 2**31-1 so the value fits
-        # comfortably in a --base-seed argument if the user wants to re-run.
-        seeds = [secrets.randbelow(2**31) for _ in range(n)]
+        # Draw one base seed from the OS RNG, then use consecutive offsets so
+        # that --base-seed <seeds[0]> reproduces the entire run exactly.
+        # Capped at 2**31-1 so the value fits comfortably as a CLI argument.
+        base = secrets.randbelow(2**31 - n)
+        seeds = [base + i for i in range(n)]
         seed_note = "(randomly generated — record these to reproduce later)"
+
+    # Detect sections once from the input so we can tailor the closing tip.
+    input_root     = read_document_xml(args.input)
+    input_body     = input_root.find(WP("body"))
+    input_children = [c for c in input_body if c.tag != WP("sectPr")]
+    sections       = detect_sections(input_children)
+    has_fib        = any(s["label"] == "Fill in Blank" for s in sections)
 
     print(f"Generating {n} version{'s' if n != 1 else ''} from: {args.input}")
     print(f"Seeds {seed_note}:")
@@ -791,8 +799,9 @@ def main():
     if args.base_seed is None:
         print("TIP: to regenerate these exact versions, re-run with "
               f"--base-seed {seeds[0]}")
-        print("     (only works if all versions were created in one run)")
-    print("Open each in Word and scroll through the FIB section to confirm blank positions.")
+    if has_fib:
+        print("Open each in Word and scroll through the fill-in-the-blank section "
+              "to confirm blank positions.")
 
 
 if __name__ == "__main__":
