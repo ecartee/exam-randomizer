@@ -9,6 +9,9 @@ venv/
 # Exam files — keep scripts and README, exclude actual exam documents
 *.docx
 
+# Claude Code
+.claude/
+
 # macOS
 .DS_Store
 
