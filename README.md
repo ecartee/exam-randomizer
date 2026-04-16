@@ -147,6 +147,25 @@ All checks passed.
 
 ---
 
+## Template
+
+`Exam_Template1.docx` is a ready-to-edit starting point. Download it, replace the placeholder content with your own questions, and run the scripts straight away.
+
+The template covers all four section types and is designed to demonstrate edge cases the randomizer handles:
+
+| Section | What it demonstrates |
+|---|---|
+| True/False | Mixed list styles (two different numIds in the same section) — common when questions are copied from multiple sources |
+| Multiple Choice | `None of the above` / `None of these` pinning; math equations; a question formatted with sub-statements (I, II, III) |
+| Fill-in-the-Blank | Soft line returns (Shift+Enter) used to create blank space for student answers — these are preserved after shuffling |
+| Workout | Sub-parts (a, b, c…) that stay with their question; per-question full-page breaks |
+
+**What to change:** the cover-page fields (course name, exam number), instructions, point values, and of course all the questions themselves.
+
+**What to keep:** the Heading 2 section headings (the keywords "True/False", "Multiple Choice", "Fill in the Blank" are what the scripts use to find each section), and the numbered-list formatting on every question stem and answer choice.
+
+---
+
 ## Document format requirements
 
 The scripts detect sections by looking for **Heading 2** paragraphs whose text contains recognisable keywords:
