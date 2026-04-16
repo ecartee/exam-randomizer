@@ -217,6 +217,8 @@ def strip_page_breaks(block):
       • Drops paragraphs that are pure page-break runs (<w:br w:type="page"/>).
       • Removes <w:pageBreakBefore/> from paragraph properties (this property
         forces a paragraph to always start on a new page).
+      • Removes inline <w:br w:type="page"/> elements embedded inside runs
+        (these can appear when a page break is inserted mid-paragraph).
 
     Soft line returns (Shift+Enter) within question content are intentional
     spacing chosen by the exam author and are left untouched.
@@ -233,6 +235,10 @@ def strip_page_breaks(block):
             pb = pPr.find(WP("pageBreakBefore"))
             if pb is not None:
                 pPr.remove(pb)
+        for run in p.findall(WP("r")):
+            for br in list(run.findall(WP("br"))):
+                if br.get(WP("type")) == "page":
+                    run.remove(br)
         result.append(p)
     return result
 
@@ -256,9 +262,50 @@ def strip_trailing_spacers(block):
     before the next question stem — are stripped.  A single uniform blank
     paragraph is then inserted between every pair of questions by the
     caller, replacing the source document's ad-hoc between-question spacing.
+
+    List-item paragraphs (those with a numId) are never stripped even if they
+    have no visible text — blank list items are structural parts of the question
+    (e.g. fill-in-the-blank answer lines).
     """
-    while block and is_blank_paragraph(block[-1]):
+    while block and is_blank_paragraph(block[-1]) and get_num_props(block[-1])[0] is None:
         block = block[:-1]
+    return block
+
+
+def strip_trailing_soft_returns(block):
+    """
+    Strip soft-return <w:br> elements that trail after the last visible text
+    in the last list-item paragraph of a block.
+
+    The last answer choice in a question often has trailing Shift+Enter breaks
+    added for visual spacing (e.g. 'False\\n\\n').  These are between-question
+    spacing, not within-question content, so they are removed here.  Soft
+    returns that appear before or between visible text in the same paragraph
+    are untouched.
+    """
+    last_list_para = next(
+        (p for p in reversed(block) if p.tag == WP("p") and get_num_props(p)[0] is not None),
+        None,
+    )
+    if last_list_para is None:
+        return block
+
+    # Find the last <w:t> element with visible text, then remove all soft-return
+    # <w:br> elements that follow it in document order.
+    all_desc   = list(last_list_para.iter())
+    last_text_idx = max(
+        (i for i, el in enumerate(all_desc)
+         if el.tag == WP("t") and el.text and el.text.strip()),
+        default=-1,
+    )
+    if last_text_idx == -1:
+        return block
+
+    for i, el in enumerate(all_desc):
+        if i > last_text_idx and el.tag == WP("br"):
+            if el.get(WP("type")) not in ("page", "column"):
+                el.getparent().remove(el)
+
     return block
 
 
@@ -471,6 +518,7 @@ def build_shuffled_body_children(body_children, sections, rng):
         pre    = strip_page_breaks(pre)       # remove source-doc breaks from preamble too
         blocks = [strip_page_breaks(b) for b in blocks]
         blocks = [strip_trailing_spacers(b) for b in blocks]
+        blocks = [strip_trailing_soft_returns(b) for b in blocks]
         rng.shuffle(blocks)
         if sec["shuffle_answers"]:
             blocks = [shuffle_mc_answers(b, sec["q_numIds"], rng) for b in blocks]
