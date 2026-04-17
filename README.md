@@ -185,6 +185,8 @@ The scripts detect sections by looking for **Heading 2** paragraphs whose text c
 
 Questions must be formatted as **Word numbered lists** (the automatic kind, not manually typed numbers). Answer choices for True/False and Multiple Choice should be **bullet-point sub-items** under each question.
 
+**Each section's questions must use their own Word list** — do not continue the same numbered list across a section heading into the next section. The script finds the boundary between adjacent sections by looking for a change in list identity (`numId` in the underlying XML). If two sections share one continuous list, the boundary between them will not be detected and questions from both sections will be shuffled together.
+
 A quick way to check whether a new exam will work: run `verify_exam.py` against the original file and two versions. If all checks pass, the format was understood correctly.
 
 ---
