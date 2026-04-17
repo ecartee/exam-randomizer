@@ -108,6 +108,11 @@ def get_text(p):
 def is_heading(p, level):
     return get_style(p) == f"Heading{level}"
 
+def is_any_heading(p):
+    """Return True if p has any Word heading style (Heading1 … Heading9)."""
+    style = get_style(p)
+    return style is not None and style.startswith("Heading")
+
 
 # ── core shuffling logic ──────────────────────────────────────────────────────
 
@@ -402,7 +407,7 @@ def detect_sections(body_children):
     for i, child in enumerate(body_children):
         if child.tag != WP("p"):
             continue
-        if is_heading(child, 2):
+        if is_any_heading(child):
             text = get_text(child).lower()
             if "true" in text:
                 heading_idx["tf"]  = i
@@ -460,7 +465,7 @@ def detect_sections(body_children):
             for i in range(first_wo_list - 1, fib_s - 1, -1):
                 if body_children[i].tag != WP("p"):
                     continue
-                if is_heading(body_children[i], 2):
+                if is_any_heading(body_children[i]):
                     wo_s = i   # promote: section starts at the heading
                     break
                 # Stop if we hit a list item (FIB content) or non-blank text

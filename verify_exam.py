@@ -76,6 +76,11 @@ def get_text(p):
 def is_heading(p, level):
     return get_style(p) == f"Heading{level}"
 
+def is_any_heading(p):
+    """Return True if p has any Word heading style (Heading1 … Heading9)."""
+    style = get_style(p)
+    return style is not None and style.startswith("Heading")
+
 
 # ── document loading ──────────────────────────────────────────────────────────
 
@@ -101,7 +106,7 @@ def detect_section_numIds(body_children):
     for i, c in enumerate(body_children):
         if c.tag != WP("p"):
             continue
-        if is_heading(c, 2):
+        if is_any_heading(c):
             text = get_text(c).lower()
             if "true" in text:
                 heading_idx["tf"]  = i

@@ -172,16 +172,18 @@ Two ready-to-edit starting points are included. Download the one that matches yo
 
 ## Document format requirements
 
-The scripts detect sections by looking for **Heading 2** paragraphs whose text contains recognisable keywords:
+The scripts detect sections by looking for **any Word heading paragraph** (Heading 1 through Heading 9) whose text contains recognisable keywords:
 
 | Keyword in heading | Section detected |
 |---|---|
 | "true" | True/False |
 | "multiple" | Multiple Choice |
 | "fill" or "blank" | Fill-in-the-Blank |
-| *(Heading 2 immediately before the first workout list item)* | Workout |
+| *(any heading immediately before the first workout list item)* | Workout |
 
-> ⚠️ **Each section heading must be its own standalone paragraph** formatted as Heading 2 — not typed inline within a question or answer choice. A common mistake is inserting a page break inside a list item and typing the next section heading on the same line: the heading text ends up inside the list item and is never recognised as a section boundary. If a section heading appears to be missing or lands in the wrong place after shuffling, check that it is a separate paragraph in the original document.
+You can use whatever heading level fits your document's style — Heading 1 for the big section breaks, Heading 2 for sub-headings, etc. The only constraint is that **no heading on the instructions page should contain the keywords above**, since the scan covers the entire document.
+
+> ⚠️ **Each section heading must be its own standalone paragraph** — not typed inline within a question or answer choice. A common mistake is inserting a page break inside a list item and typing the next section heading on the same line: the heading text ends up inside the list item and is never recognised as a section boundary. If a section heading appears to be missing or lands in the wrong place after shuffling, check that it is a separate paragraph in the original document.
 
 Questions must be formatted as **Word multilevel lists** (the automatic kind, not manually typed numbers or letters). Answer choices for True/False and Multiple Choice must be **sub-items of the same list** — one indent level deeper than the question stem. The visual appearance does not matter: question numbers can be Arabic, Roman, or lettered; answer choices can be bullets, A/B/C/D, numbers, or any other style. What matters is that they are all part of the same Word list, so the script can identify stems (level 1) and their answer choices (level 2) by list structure alone.
 
