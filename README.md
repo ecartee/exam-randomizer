@@ -181,7 +181,7 @@ The scripts detect sections by looking for **any Word heading paragraph** (Headi
 | "fill" or "blank" | Fill-in-the-Blank |
 | *(any heading immediately before the first workout list item)* | Workout |
 
-You can use whatever heading level fits your document's style — Heading 1 for the big section breaks, Heading 2 for sub-headings, etc. The only constraint is that **no heading on the instructions page should contain the keywords above**, since the scan covers the entire document.
+You can use whatever heading level fits your document's style — Heading 1 for the big section breaks, Heading 2 for sub-headings, etc. **Sections can appear in any order** — the scripts detect each section's position independently and process them in whatever order they appear. The only constraint is that **no heading on the instructions page should contain the keywords above**, since the scan covers the entire document.
 
 > ⚠️ **Each section heading must be its own standalone paragraph** — not typed inline within a question or answer choice. A common mistake is inserting a page break inside a list item and typing the next section heading on the same line: the heading text ends up inside the list item and is never recognised as a section boundary. If a section heading appears to be missing or lands in the wrong place after shuffling, check that it is a separate paragraph in the original document.
 

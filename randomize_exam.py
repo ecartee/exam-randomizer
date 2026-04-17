@@ -382,7 +382,8 @@ def update_version_label(body, new_label):
 
 def detect_sections(body_children):
     """
-    Identify the four shuffleable sections and return a list of section dicts:
+    Identify the four shuffleable sections and return a list of section dicts
+    in document order:
         {
           'label':            str,          human-readable name
           'paras':            [p],          all paragraphs in this section
@@ -396,13 +397,17 @@ def detect_sections(body_children):
     copy-pasting from multiple sources.
 
     Sections are located as follows:
-        True/False      — Heading2 whose text contains "true"
-        Multiple Choice — Heading2 whose text contains "multiple"
-        Fill in Blank   — Heading2 whose text contains "fill" or "blank"
-        Workout         — no Heading2; detected as the first ilvl=0 numId
-                          after FIB that doesn't appear in the FIB numId set
+        True/False      — any heading whose text contains "true"
+        Multiple Choice — any heading whose text contains "multiple"
+        Fill in Blank   — any heading whose text contains "fill" or "blank"
+        Workout         — detected by list structure: the first ilvl=0 numId
+                          that differs from the last keyword-section's numId
+
+    Sections may appear in any order in the document.
     """
-    # ── Pass 1: find Heading2 positions by keyword ────────────────────────────
+    n = len(body_children)
+
+    # ── Pass 1: find heading positions by keyword ─────────────────────────────
     heading_idx = {}
     for i, child in enumerate(body_children):
         if child.tag != WP("p"):
@@ -416,67 +421,14 @@ def detect_sections(body_children):
             elif "fill" in text or "blank" in text:
                 heading_idx["fib"] = i
 
-    n     = len(body_children)
-    mc_s  = heading_idx.get("mc",  n)
-    fib_s = heading_idx.get("fib", n)
-    # Default tf_s to mc_s (not 0) so that paragraphs before the first
-    # detected heading — title, instructions, cover-page content — are never
-    # included in any section and are always passed through untouched.
-    tf_s  = heading_idx.get("tf",  mc_s)
+    if not heading_idx:
+        return []
 
-    # ── Pass 2: find the *first* ilvl=0 numId in FIB — used only to locate
-    #            the FIB/Workout boundary, not as the sole question identifier
-    def first_q_numId(start, end):
-        for i in range(start, end):
-            if body_children[i].tag != WP("p"):
-                continue
-            nid, ilvl = get_num_props(body_children[i])
-            if nid is not None and ilvl == "0":
-                return nid
-        return None
+    # Sort by document position — sections may appear in any order
+    ordered = sorted(heading_idx.items(), key=lambda x: x[1])
+    first_s = ordered[0][1]   # cover page / instructions end here
 
-    fib_first_id = first_q_numId(fib_s, n)
-
-    # ── Pass 3: find where Workout begins.
-    #
-    # Step A: find the first ilvl=0 list item after FIB whose numId differs
-    #         from the FIB numId — that's the first Workout question stem.
-    # Step B: scan *backward* from that list item looking for a Heading 2
-    #         that immediately precedes it (with only blank paragraphs in
-    #         between).  If found, start the Workout section at the heading
-    #         so that it lands in the Workout section's 'pre' (preamble) and
-    #         gets the page-break treatment rather than being glued to the
-    #         last FIB question block.
-    wo_s = n
-    if fib_first_id is not None:
-        first_wo_list = n
-        for i in range(fib_s, n):
-            if body_children[i].tag != WP("p"):
-                continue
-            nid, ilvl = get_num_props(body_children[i])
-            if nid is not None and ilvl == "0" and nid != fib_first_id:
-                first_wo_list = i
-                break
-
-        wo_s = first_wo_list   # default: start at the first list item
-
-        # Walk backward to find an immediately preceding Heading 2
-        if first_wo_list < n:
-            for i in range(first_wo_list - 1, fib_s - 1, -1):
-                if body_children[i].tag != WP("p"):
-                    continue
-                if is_any_heading(body_children[i]):
-                    wo_s = i   # promote: section starts at the heading
-                    break
-                # Stop if we hit a list item (FIB content) or non-blank text
-                nid, _ = get_num_props(body_children[i])
-                if nid is not None:
-                    break
-                if any(t.text and t.text.strip()
-                       for t in body_children[i].iter(WP("t"))):
-                    break
-
-    # ── Pass 4: collect ALL ilvl=0 numIds within each section's actual range
+    # ── Helper: collect all ilvl=0 numIds in a paragraph range ───────────────
     def all_numIds(start, end):
         ids = set()
         for i in range(start, end):
@@ -487,44 +439,118 @@ def detect_sections(body_children):
                 ids.add(nid)
         return frozenset(ids)
 
-    tf_ids  = all_numIds(tf_s,  mc_s)
-    mc_ids  = all_numIds(mc_s,  fib_s)
-    fib_ids = all_numIds(fib_s, wo_s)   # only the FIB range, not Workout
-    wo_ids  = all_numIds(wo_s,  n)
+    # ── Pass 2: find where Workout begins ─────────────────────────────────────
+    #
+    # Workout is detected as the first ilvl=0 list item after the last
+    # keyword-detected section whose numId differs from that section's list.
+    # We scan backward from that list item to find a preceding heading, so
+    # the Workout heading lands in the section's preamble rather than being
+    # glued to the last question of the preceding section.
+    last_key, last_s = ordered[-1]
 
-    # ── Move the workout boundary back to just after the last FIB list item.
-    #    Paragraphs between the last FIB question and the first workout question
-    #    (heading, instructions, blank lines) belong to the workout preamble.
-    if wo_ids and fib_ids:
-        last_fib_item = fib_s
-        for i in range(fib_s, wo_s):
-            if body_children[i].tag == WP("p"):
+    last_first_id = None
+    for i in range(last_s, n):
+        if body_children[i].tag != WP("p"):
+            continue
+        nid, ilvl = get_num_props(body_children[i])
+        if nid is not None and ilvl == "0":
+            last_first_id = nid
+            break
+
+    wo_s = n
+    if last_first_id is not None:
+        first_wo_list = n
+        for i in range(last_s, n):
+            if body_children[i].tag != WP("p"):
+                continue
+            nid, ilvl = get_num_props(body_children[i])
+            if nid is not None and ilvl == "0" and nid != last_first_id:
+                first_wo_list = i
+                break
+
+        wo_s = first_wo_list
+
+        # Walk backward to find an immediately preceding heading
+        if first_wo_list < n:
+            for i in range(first_wo_list - 1, last_s - 1, -1):
+                if body_children[i].tag != WP("p"):
+                    continue
+                if is_any_heading(body_children[i]):
+                    wo_s = i
+                    break
                 nid, _ = get_num_props(body_children[i])
-                if nid in fib_ids:
-                    last_fib_item = i
-        if last_fib_item + 1 < wo_s:
-            wo_s = last_fib_item + 1
+                if nid is not None:
+                    break
+                if any(t.text and t.text.strip()
+                       for t in body_children[i].iter(WP("t"))):
+                    break
 
-    # ── Find the first "INTENTIONALLY LEFT BLANK" paragraph.
-    #    This acts as a hard stop for ALL sections — those pages must never be
-    #    included in any question block, regardless of which section is last.
+    # ── Pass 3: compute section ranges in document order ──────────────────────
+    # Each keyword section's range ends where the next one begins; the last
+    # keyword section's range ends at wo_s.
+    section_ranges = {}
+    for i, (key, start) in enumerate(ordered):
+        end = ordered[i + 1][1] if i + 1 < len(ordered) else wo_s
+        section_ranges[key] = (start, end)
+
+    # ── Pass 4: find "INTENTIONALLY LEFT BLANK" boundary ─────────────────────
     questions_end = n
-    for i in range(tf_s, n):
+    for i in range(first_s, n):
         if body_children[i].tag == WP("p"):
             if "INTENTIONALLY LEFT BLANK" in get_text(body_children[i]).upper():
                 questions_end = i
                 break
 
-    # ── Build section list
-    sections = []
-    if tf_ids:
-        sections.append({"label": "True/False",      "paras": body_children[tf_s:min(mc_s,  questions_end)], "q_numIds": tf_ids,  "shuffle_answers": False})
-    if mc_ids:
-        sections.append({"label": "Multiple Choice", "paras": body_children[mc_s:min(fib_s, questions_end)], "q_numIds": mc_ids,  "shuffle_answers": True})
-    if fib_ids:
-        sections.append({"label": "Fill in Blank",   "paras": body_children[fib_s:min(wo_s, questions_end)], "q_numIds": fib_ids, "shuffle_answers": False})
+    # ── Pass 5: collect Workout numIds; trim the preceding section's end ──────
+    wo_ids = all_numIds(wo_s, questions_end)
+
     if wo_ids:
-        sections.append({"label": "Workout",         "paras": body_children[wo_s:questions_end],              "q_numIds": wo_ids,  "shuffle_answers": False})
+        # Move wo_s back to just after the last list item of the preceding
+        # section so that any blank/heading paragraphs between the sections
+        # belong to the Workout preamble rather than the preceding section's
+        # last question block.
+        last_start, last_end = section_ranges[last_key]
+        last_ids = all_numIds(last_start, last_end)
+        if last_ids:
+            last_item = last_start
+            for i in range(last_start, wo_s):
+                if body_children[i].tag == WP("p"):
+                    nid, _ = get_num_props(body_children[i])
+                    if nid in last_ids:
+                        last_item = i
+            if last_item + 1 < wo_s:
+                section_ranges[last_key] = (last_start, last_item + 1)
+                wo_s  = last_item + 1
+                wo_ids = all_numIds(wo_s, questions_end)
+
+    # ── Build section list in document order ──────────────────────────────────
+    SECTION_META = {
+        "tf":  {"label": "True/False",      "shuffle_answers": False},
+        "mc":  {"label": "Multiple Choice",  "shuffle_answers": True},
+        "fib": {"label": "Fill in Blank",    "shuffle_answers": False},
+    }
+
+    sections = []
+    for key, _ in ordered:
+        start, end = section_ranges[key]
+        meta      = SECTION_META[key]
+        q_numIds  = all_numIds(start, min(end, questions_end))
+        if q_numIds:
+            sections.append({
+                "label":           meta["label"],
+                "paras":           body_children[start:min(end, questions_end)],
+                "q_numIds":        q_numIds,
+                "shuffle_answers": meta["shuffle_answers"],
+            })
+
+    if wo_ids:
+        sections.append({
+            "label":           "Workout",
+            "paras":           body_children[wo_s:questions_end],
+            "q_numIds":        wo_ids,
+            "shuffle_answers": False,
+        })
+
     return sections
 
 

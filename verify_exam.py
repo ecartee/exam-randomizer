@@ -99,6 +99,7 @@ def detect_section_numIds(body_children):
     Return {key: frozenset_of_numIds} for the four exam sections.
     An empty frozenset means that section is absent.
 
+    Sections may appear in any order in the document.
     Uses frozensets so that sections where different questions were formatted
     with different Word list styles (different numIds) are handled correctly.
     """
@@ -115,36 +116,8 @@ def detect_section_numIds(body_children):
             elif "fill" in text or "blank" in text:
                 heading_idx["fib"] = i
 
-    n     = len(body_children)
-    mc_s  = heading_idx.get("mc",  n)
-    fib_s = heading_idx.get("fib", n)
-    # Default tf_s to mc_s (not 0) so paragraphs before the first detected
-    # heading — title, instructions, cover content — are never included in
-    # any section and are always left completely untouched.
-    tf_s  = heading_idx.get("tf",  mc_s)
+    n = len(body_children)
 
-    # Find first FIB numId (used only for the FIB/Workout boundary)
-    fib_first_id = None
-    for i in range(fib_s, n):
-        if body_children[i].tag != WP("p"):
-            continue
-        nid, ilvl = get_num_props(body_children[i])
-        if nid and ilvl == "0":
-            fib_first_id = nid
-            break
-
-    # Find where Workout begins
-    wo_s = n
-    if fib_first_id:
-        for i in range(fib_s, n):
-            if body_children[i].tag != WP("p"):
-                continue
-            nid, ilvl = get_num_props(body_children[i])
-            if nid and ilvl == "0" and nid != fib_first_id:
-                wo_s = i
-                break
-
-    # Collect ALL ilvl=0 numIds in each section's range
     def all_numIds(start, end):
         ids = set()
         for i in range(start, end):
@@ -155,12 +128,49 @@ def detect_section_numIds(body_children):
                 ids.add(nid)
         return frozenset(ids)
 
-    return {
-        "tf":  all_numIds(tf_s,  mc_s),
-        "mc":  all_numIds(mc_s,  fib_s),
-        "fib": all_numIds(fib_s, wo_s),
-        "wo":  all_numIds(wo_s,  n),
-    }
+    if not heading_idx:
+        return {"tf": frozenset(), "mc": frozenset(), "fib": frozenset(), "wo": frozenset()}
+
+    # Sort sections by document position
+    ordered = sorted(heading_idx.items(), key=lambda x: x[1])
+
+    # Compute ranges: each section ends where the next begins
+    last_key, last_s = ordered[-1]
+    section_ranges = {}
+    for i, (key, start) in enumerate(ordered):
+        end = ordered[i + 1][1] if i + 1 < len(ordered) else n
+        section_ranges[key] = (start, end)
+
+    # Find Workout: first ilvl=0 list item after the last keyword section
+    # whose numId differs from that section's list
+    last_first_id = None
+    for i in range(last_s, n):
+        if body_children[i].tag != WP("p"):
+            continue
+        nid, ilvl = get_num_props(body_children[i])
+        if nid and ilvl == "0":
+            last_first_id = nid
+            break
+
+    wo_s = n
+    if last_first_id:
+        for i in range(last_s, n):
+            if body_children[i].tag != WP("p"):
+                continue
+            nid, ilvl = get_num_props(body_children[i])
+            if nid and ilvl == "0" and nid != last_first_id:
+                wo_s = i
+                break
+
+    # Trim last keyword section to end before Workout
+    last_start, _ = section_ranges[last_key]
+    section_ranges[last_key] = (last_start, wo_s)
+
+    result = {"tf": frozenset(), "mc": frozenset(), "fib": frozenset()}
+    for key, (start, end) in section_ranges.items():
+        result[key] = all_numIds(start, end)
+    result["wo"] = all_numIds(wo_s, n)
+    return result
 
 
 def extract_questions(body_children, q_numIds):
